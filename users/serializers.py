@@ -2,6 +2,8 @@ import uuid
 from shared.uitility import check_email_or_phone, send_email
 from .models import User, UserConfirmation, VIA_EMAIL, VIA_PHONE_NUMBER,NEW, CODE_VERIFIED, DONE, PHOTO_STEP
 from rest_framework import exceptions
+from django.core.validators import validate_email
+from django.utils.translation import gettext_lazy as _
 from django.db.models import Q
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -48,6 +50,7 @@ class SignUpSerializer(serializers.ModelSerializer):
     def auth_validate(data):
         print(data)
         user_input = str(data.get('email_phone_number')).lower()
+        print(user_input,'++++++++++++')
         input_type = check_email_or_phone(user_input)
         if input_type == 'email':
             data = {
@@ -82,5 +85,43 @@ class SignUpSerializer(serializers.ModelSerializer):
 
 
 
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'user_roles',
+            'auth_type',
+            'auth_status',
+            'email',
+            'phone_number',
+            'photo',
+        ]
+
+    def validate_email(self, value):
+        value = value.lower()
+        try:
+            validate_email(value)
+        except ValidationError:
+            raise serializers.ValidationError(_("Invalid email format"))
+        return value
+
+    # def validate_phone_number(self, value):
+    #     if not value.isdigit() or len(value) < 10:
+    #         raise serializers.ValidationError(_("Invalid phone number format"))
+    #     return value
+
+    def validate(self, data):
+        auth_type = data.get('auth_type')
+        email = data.get('email')
+        phone_number = data.get('phone_number')
+
+        if auth_type == VIA_EMAIL and not email:
+            raise serializers.ValidationError(_("Email is required for VIA_EMAIL authentication"))
+
+        if auth_type == VIA_PHONE_NUMBER and not phone_number:
+            raise serializers.ValidationError(_("Phone number is required for VIA_PHONE_NUMBER authentication"))
+
+        return data
 
 
